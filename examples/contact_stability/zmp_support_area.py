@@ -34,6 +34,12 @@ from pymanoid.gui import PointMassWrenchDrawer
 from pymanoid.gui import draw_polygon
 from pymanoid.misc import matplotlib_to_rgb, norm
 
+import sys, getopt
+
+unixOptions = "hs:r:"
+gnuOptions = ["help","stance=", "robot="]
+
+
 com_height = 0.9  # [m]
 z_polygon = 2.
 
@@ -144,9 +150,46 @@ class COMSync(pymanoid.Process):
 
 
 if __name__ == "__main__":
+
+    # read commandline arguments, first
+    fullCmdArguments = sys.argv
+
+    # - further arguments
+    argumentList = fullCmdArguments[1:]
+
+    try:
+        arguments, values = getopt.getopt(argumentList, unixOptions, gnuOptions)
+    except getopt.error as err:
+        # output error, and return with an error code
+        print (str(err))
+        sys.exit(2)
+
+    robotStance = ""
+    robotType = ""
+
+    for currentArgument, currentValue in arguments:
+        if currentArgument in ("-h", "--help"):
+            print ("Usage: python zmp_support_area.py --stance robotStance --robot jvrc1")
+
+        elif currentArgument in ("-s", "--stance"):
+            print (("enabling stance: %s") %(currentValue))
+            robotStance = currentValue
+
+        elif currentArgument in ("-r", "--robot"):
+            print (("enabling robot type: %s") % (currentValue))
+            robotType = currentValue
+
     sim = pymanoid.Simulation(dt=0.03)
-    #robot = pymanoid.robots.JVRC1('JVRC-1.dae', download_if_needed=True)
-    robot = pymanoid.robots.HRP4('hrp4.dae')
+
+    if robotType == "hrp4":
+        robot = pymanoid.robots.HRP4('hrp4.dae')
+    elif (robotType == "jvrc1"):
+        robot = pymanoid.robots.JVRC1('JVRC-1.dae', download_if_needed=True)
+    else:
+        print("Robot type is not set")
+        sys.exit(2)
+
+
     sim.set_viewer()
     sim.viewer.SetCamera([
         [0.60587192, -0.36596244,  0.70639274, -2.4904027],
@@ -157,13 +200,19 @@ if __name__ == "__main__":
 
     com_above = pymanoid.Cube(0.02, [0.05, 0.04, z_polygon], color='b')
 
+    if len(robotStance) == 0:
+        stance = Stance.from_json('stances/hrp4-single-pose.json')
+    else:
+        stance = Stance.from_json(robotStance)
+
     #stance = Stance.from_json('stances/single.json')
     #stance = Stance.from_json('stances/double.json')
-    stance = Stance.from_json('stances/hrp4-triple-pose.json')
+
     #stance = Stance.from_json('stances/hrp4-double-pose.json')
     #stance = Stance.from_json('stances/hrp4-single-pose.json')
 
     #stance = Stance.from_json('stances/triple.json')
+
 
     stance.bind(robot)
     robot.ik.solve()
