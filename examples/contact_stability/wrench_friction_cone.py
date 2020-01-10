@@ -28,6 +28,7 @@ import IPython
 from numpy import array
 
 import pymanoid
+import vimpdb
 
 from pymanoid import Stance
 
@@ -57,6 +58,8 @@ if __name__ == "__main__":
     robot.ik.solve()
     sim.schedule(robot.ik)
     sim.start()
+
+    vimpdb.set_trace()
 
     p = array([0., 0., 0.])
     CWC_O = stance.compute_wrench_inequalities(p)

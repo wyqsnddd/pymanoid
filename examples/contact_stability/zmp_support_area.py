@@ -70,6 +70,8 @@ class SupportAreaDrawer(pymanoid.Process):
         self.update_contact_poses()
         self.update_polygon()
 
+
+
     def clear(self):
         self.handle = None
 
@@ -84,7 +86,11 @@ class SupportAreaDrawer(pymanoid.Process):
     def update_polygon(self):
         self.handle = None
         try:
+            print("going to compute:")
             vertices = self.stance.compute_zmp_support_area(self.height)
+            print("computed!")
+
+
             self.handle = draw_polygon(
                 [(x[0], x[1], self.height) for x in vertices],
                 normal=[0, 0, 1], color=(0.0, 0.0, 0.5, 0.5))
@@ -139,7 +145,8 @@ class COMSync(pymanoid.Process):
 
 if __name__ == "__main__":
     sim = pymanoid.Simulation(dt=0.03)
-    robot = pymanoid.robots.JVRC1('JVRC-1.dae', download_if_needed=True)
+    #robot = pymanoid.robots.JVRC1('JVRC-1.dae', download_if_needed=True)
+    robot = pymanoid.robots.HRP4('hrp4.dae')
     sim.set_viewer()
     sim.viewer.SetCamera([
         [0.60587192, -0.36596244,  0.70639274, -2.4904027],
@@ -150,12 +157,23 @@ if __name__ == "__main__":
 
     com_above = pymanoid.Cube(0.02, [0.05, 0.04, z_polygon], color='b')
 
-    stance = Stance.from_json('stances/double.json')
+    #stance = Stance.from_json('stances/single.json')
+    #stance = Stance.from_json('stances/double.json')
+    stance = Stance.from_json('stances/hrp4-triple-pose.json')
+    #stance = Stance.from_json('stances/hrp4-double-pose.json')
+    #stance = Stance.from_json('stances/hrp4-single-pose.json')
+
+    #stance = Stance.from_json('stances/triple.json')
+
     stance.bind(robot)
     robot.ik.solve()
 
+
     com_sync = COMSync(stance, com_above)
+
     support_area_drawer = SupportAreaDrawer(stance, z_polygon)
+
+
     wrench_drawer = StaticWrenchDrawer(stance)
 
     sim.schedule(robot.ik)

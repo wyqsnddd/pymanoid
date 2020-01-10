@@ -18,14 +18,16 @@
 # pymanoid. If not, see <http://www.gnu.org/licenses/>.
 
 from numpy import array, ndarray
+import numpy as np
 from numpy import cross, diag, dot, eye, hstack, sqrt, vstack, zeros
 from scipy.linalg import block_diag
+
 
 from .body import Box
 from .pypoman import compute_cone_face_matrix, compute_polygon_hull
 from .pypoman import project_polytope
 from .qpsolvers import solve_qp
-from .transformations import crossmat
+from .transformations import crossmat, quat_from_rotation_matrix
 
 
 class Contact(Box):
@@ -173,6 +175,19 @@ class Contact(Box):
         """
         return array(self.force_rays).T
 
+    def compute_pseudo_grasp_matrix(self, p):
+
+        graspMatrix = array([
+            # fx fy  fz taux tauy tauz
+            [1, 0, 0, 0, 0, 0],
+            [0, 1, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 1]])
+
+        return graspMatrix
+
     def compute_grasp_matrix(self, p):
         """
         Compute the grasp matrix for a given destination point.
@@ -197,14 +212,22 @@ class Contact(Box):
             Grasp matrix :math:`G_P`.
         """
         x, y, z = self.p - p
-        return array([
+
+        graspMatrix = array([
             # fx fy  fz taux tauy tauz
-            [1,   0,  0,   0,   0,   0],
-            [0,   1,  0,   0,   0,   0],
-            [0,   0,  1,   0,   0,   0],
-            [0,  -z,  y,   1,   0,   0],
-            [z,   0, -x,   0,   1,   0],
-            [-y,  x,  0,   0,   0,   1]])
+            [1, 0, 0, 0, 0, 0],
+            [0, 1, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0],
+            [0, -z, y, 1, 0, 0],
+            [z, 0, -x, 0, 1, 0],
+            [-y, x, 0, 0, 0, 1]])
+
+        graspMatrix[:3,:3] = self.R.T
+        graspMatrix[3:, 3:] = self.R.T
+        graspMatrix[3:, :3] = -self.R.T * graspMatrix[3:, :3]
+
+        return graspMatrix
+
 
     @property
     def vertices(self):
@@ -256,6 +279,8 @@ class Contact(Box):
             self.set_color('b')
         self.is_managed = True
         self.wrench = dot(block_diag(self.R, self.R), wrench)
+
+
 
     def unset_wrench(self):
         """
@@ -323,7 +348,33 @@ class Contact(Box):
             [+Y, -X, -(X + Y) * mu, +mu, -mu,  +1],
             [-Y, +X, -(X + Y) * mu, -mu, +mu,  +1],
             [-Y, -X, -(X + Y) * mu, -mu, -mu,  +1]])
-        return dot(local_cone, block_diag(self.R.T, self.R.T))
+
+        np.set_printoptions(linewidth=np.inf)
+
+        #print ("The local cwc is:")
+        #print np.matrix(local_cone)
+        #print ("The transform matrix is: ")
+
+        #print np.matrix(self.T)
+        #print ("The quaternion is: ")
+
+        #print np.matrix(quat_from_rotation_matrix(self.R))
+        #cwc = dot(local_cone, block_diag(self.R.T, self.R.T))
+
+        #tempGraspMatrix = block_diag(self.R.T, self.R.T)
+        tempGraspMatrix = self.compute_grasp_matrix([0, 0, 0])
+
+        #print ("The grasp matrix is:")
+        #print np.matrix(tempGraspMatrix)
+
+        #cwc = np.matrix(local_cone)*tempGraspMatrix
+
+        #print ("The CWC is:")
+        #print np.matrix(cwc)
+
+        #return np.matrix(local_cone)*tempGraspMatrix
+
+        return np.matrix(local_cone)*tempGraspMatrix
 
     @property
     def wrench_hrep(self):
@@ -408,6 +459,9 @@ class ContactSet(object):
         assert type(contacts) is list
         self.contacts = contacts
         self.nb_contacts = len(self.contacts)
+
+    def compute_pseudo_grasp_matrix(self, p):
+        return hstack([c.compute_pseudo_grasp_matrix(p) for c in self.contacts])
 
     def compute_grasp_matrix(self, p):
         """

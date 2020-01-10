@@ -33,6 +33,7 @@ from .sim import Process
 from .sim import gravity
 from .tasks import COMTask, ContactTask, DOFTask, MinVelTask, PostureTask
 
+import numpy as np
 
 class Stance(ContactSet):
 
@@ -317,22 +318,57 @@ class Stance(ContactSet):
         formulation from [Caron17z]_. See the Appendix from [Caron16]_ for a
         performance comparison.
         """
-        crossmat_n = array([[0, -1, 0], [1, 0, 0], [0, 0, 0]])  # n = [0, 0, 1]
+
+        crossmat_n = array([[0, -1, 0], [1, 0, 0], [0, 0, 0]])  #
+
         G = self.compute_grasp_matrix([0, 0, 0])
+
+
         F_list, b_list = zip(*[ct.wrench_hrep for ct in self.contacts])
         F = block_diag(*F_list)
         b = hstack(b_list)
         mass = 42.  # [kg], does not affect the output
         # mass has no effect on the output polygon, c.f. Section IV.C in
-        # <https://hal.archives-ouvertes.fr/hal-01349880>
+        # <https0://hal.archives-ouvertes.fr/hal-01349880>
         B1 = hstack([self.com.z * eye(3), crossmat_n])
-        B2 = hstack([zeros(3), self.com.p])
+        #B2 = hstack([zeros(3), self.com.p])
         # B2 = hstack([-(cross(n, p_in)), n])]) yields same result
+        n = [0, 0, 1]
+        B2 = hstack([-(cross(n, self.com.p)), n])
+
         B = vstack([B1, B2])
-        C = 1. / (mass * 9.81) * dot(B, G)
+        pseudoG = self.compute_pseudo_grasp_matrix([0, 0, 0])
+
+        #C = 1. / (mass * 9.81) * dot(B, G)
+        C = 1. / (mass * 9.81) * dot(B,pseudoG)
+
         d = hstack([self.com.p, [0]])
-        E = (height - self.com.z) / (mass * 9.81) * G[:2, :]
+
+
+
+        #E = (height - self.com.z) / (mass * 9.81) * G[:2, :]
+
+        E = (height - self.com.z) / (mass * 9.81)* pseudoG[:2, :]
+
         f = array([self.com.x, self.com.y])
+        np.set_printoptions(linewidth=np.inf)
+
+        print("E matrix is: ")
+        print(np.matrix(E))
+
+        print("f vector is: ")
+        print(np.matrix(f))
+
+        print("F matrix is: ")
+        print(np.matrix(F))
+        print("b vector is: ")
+        print(np.matrix(b))
+
+        print("C matrix is: ")
+        print(np.matrix(C))
+        print("d vector is: ")
+        print(np.matrix(d))
+
         return project_polytope(
             proj=(E, f),
             ineq=(F, b),
